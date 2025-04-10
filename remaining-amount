@@ -1,0 +1,31 @@
+// File: backend/routes/budgetRemainingAmount.js
+const express = require('express');
+const router = express.Router();
+const db = require('../db'); // Kết nối đến cơ sở dữ liệu
+
+// Lấy số tiền còn lại trong ngân sách
+router.get('/remaining-amount', (req, res) => {
+  const month = req.query.month; // Lấy tháng từ query string
+
+  // Lấy ngân sách tháng và tổng chi tiêu
+  const query = `
+    SELECT
+      budget.amount AS budgetAmount,
+      SUM(CASE WHEN transactions.type = 'expense' THEN transactions.amount ELSE 0 END) AS totalExpense
+    FROM budget
+    LEFT JOIN transactions ON strftime('%Y-%m', transactions.date) = ? 
+    GROUP BY budget.amount
+  `;
+  db.get(query, [month], (err, row) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    if (!row) {
+      return res.status(404).json({ message: 'No budget found for this month' });
+    }
+    const remaining = row.budgetAmount - row.totalExpense;
+    res.json({ remaining: remaining >= 0 ? remaining : 0 });
+  });
+});
+
+module.exports = router;
